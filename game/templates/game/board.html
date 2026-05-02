@@ -201,7 +201,7 @@
             width: 54px;
             height: 54px;
             z-index: 2;
-            pointer-events: none;
+            pointer-events: auto;
             user-select: none;
         }
         .piece.dragging { opacity: 0.35; }
@@ -410,6 +410,20 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
+        }
+        .playable:hover {
+            cursor: pointer;
+        }
+
+        .square, .piece {
+            cursor: default;
+        }
+        .white-turn .piece.white:hover {
+            cursor: pointer;
+        }
+
+        .black-turn .piece.black:hover {
+            cursor: pointer;
         }
 
     </style>
@@ -688,7 +702,7 @@
 
                 const img = document.createElement('img');
                 img.src = PIECE_IMG[pKey(p)];
-                img.className = 'piece';
+                img.className = 'piece ' + pColor(p);
                 img.draggable = true;
                 img.ondragstart = e => onDragStart(e,r,c);
                 img.ondragend = () => dragging = false;
@@ -937,6 +951,8 @@
             turnEl.className = 'turn-badge ' + turn;
             document.getElementById('whiteClock').classList.toggle('active', turn === 'white');
             document.getElementById('blackClock').classList.toggle('active', turn === 'black');
+            document.body.classList.remove('white-turn', 'black-turn');
+            document.body.classList.add(turn === 'white' ? 'white-turn' : 'black-turn');
         }
 
         function updateMoves(history) {
