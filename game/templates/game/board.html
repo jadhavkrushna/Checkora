@@ -158,15 +158,19 @@
         /* ============================================================
            Squares
            ============================================================ */
-        .square {
-            width: 60px;
-            height: 60px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            cursor: pointer;
-        }
+       .square {
+        width: 60px;
+        height: 60px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        cursor: default;  
+    }
+
+    .square:has(.piece.playable) {
+        cursor: pointer;   
+    }
 
         .square.light { background-color: #eeeed2; }
         .square.dark  { background-color: #769656; }
@@ -211,6 +215,7 @@
             pointer-events: none;
             user-select: none;
         }
+        .piece.playable { cursor: pointer; }
         .piece.dragging { opacity: 0.35; }
 
         /* ============================================================
@@ -728,8 +733,21 @@
                 el.appendChild(img);
             }
             refreshHighlights();
+            markPlayable();
         }
 
+        function markPlayable() {
+    boardEl.querySelectorAll('.piece').forEach(img => {
+        const el = img.closest('.square');
+        const idx = Array.from(boardEl.children).indexOf(el);
+        const r = Math.floor(idx / 8);
+        const c = idx % 8;
+        const p = board[r][c];
+        const isPlayable = p && pColor(p) === turn
+            && !(gameMode === 'ai' && turn === 'black');
+        img.classList.toggle('playable', isPlayable);
+    });
+}
         function refreshHighlights() {
             boardEl.querySelectorAll('.square').forEach(el => {
                 el.classList.remove('selected', 'last-move');
@@ -970,6 +988,7 @@
             turnEl.className = 'turn-badge ' + turn;
             document.getElementById('whiteClock').classList.toggle('active', turn === 'white');
             document.getElementById('blackClock').classList.toggle('active', turn === 'black');
+            markPlayable();
             // Update browser tab title to reflect whose turn it is
             if (!gameOver) {
                 document.title = (turn === 'white' ? 'White to Move - Checkora' : 'Black to Move - Checkora');
