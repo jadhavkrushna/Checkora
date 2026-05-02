@@ -26,6 +26,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: write   # allows posting CI summary comments on PRs
+  deployments: read      # required for Vercel preview polling
 
 env:
   DJANGO_SETTINGS_MODULE: core.settings
@@ -276,7 +277,7 @@ jobs:
     
     steps:
       - name: ⏳ Wait for Vercel Preview/Production Deployment
-        uses: patrickedqvist/wait-for-vercel-preview@v1.3.2
+        uses: patrickedqvist/wait-for-vercel-preview@06c79330064b0e6ef7a2574603b62d3c98789125 # v1.3.2
         id: waitForVercel
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
