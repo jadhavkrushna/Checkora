@@ -1125,7 +1125,7 @@
             gameOver = false;
             gameMode = d.mode;
             
-            // ADD THESE TWO LINES FOR NEW GAME AFTER RESETS    
+            //  FOR NEW GAME AFTER RESETS    
             if (document.getElementById('resignBtn')) document.getElementById('resignBtn').style.display = 'inline-block';
             if (document.getElementById('pauseBtn')) document.getElementById('pauseBtn').style.display = 'inline-block';
 
@@ -1154,28 +1154,23 @@
                     gameOver = true;
                     paused = true;
                     
-                    // 1. Update the status bar text
+                    // Update the status bar text
                     const statusEl = document.getElementById('statusBar');
                     if (statusEl) {
                         statusEl.textContent = response.game_status;
                         statusEl.style.color = "#f0c040";
                     }
 
-                    // 2. Use the existing Game Over modal to show the winner
-                    // This is what Edward meant by "cleaner"
+                    // Use the existing Game Over modal to show the winner
                     document.getElementById('gameOverTitle').textContent = "Game Over";
                     document.getElementById('gameOverMessage').textContent = response.message + " " + response.game_status;
                     document.getElementById('gameOverOverlay').style.display = 'flex';
 
-                    // 3. Hide the buttons
+                    // Hide the buttons
                     document.getElementById('resignBtn').style.display = 'none';
                     document.getElementById('pauseBtn').style.display = 'none';
                     
                     // This connects the "New Game" buttons inside the overlay to the game's start function
-                    //document.getElementById('gameOverPvPBtn').onclick = () => { document.getElementById('gameOverOverlay').style.display = 'none'; startNewGame('pvp'); };
-                    //document.getElementById('gameOverAIBtn').onclick = () => { document.getElementById('gameOverOverlay').style.display = 'none'; startNewGame('ai'); };
-
-                    // Update these inside your confirmResign function
                     document.getElementById('gameOverPvPBtn').onclick = async () => { 
                     document.getElementById('gameOverOverlay').style.display = 'none';
                     gameOver = false; 
