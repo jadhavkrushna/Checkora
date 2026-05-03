@@ -484,7 +484,6 @@ class OpeningBookTest(SimpleTestCase):
         )
         ChessGame._opening_book = None
 
-
     def test_book_moves_show_variety(self):
         """With multiple candidates different moves should be chosen over many calls."""
         game = ChessGame()
