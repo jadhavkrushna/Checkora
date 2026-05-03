@@ -574,7 +574,7 @@
     <script>
     (() => {
         'use strict';
-
+        let lastHighlighted = [];
         /* ==========================================================
         CONSTANTS & STATE
         ========================================================== */
@@ -588,7 +588,24 @@
         let selected = null;
         let hints = [];
         let lastMove = null;
+        function highlightMove(fromRow, fromCol, toRow, toCol) {
+    // remove old highlight
+    lastHighlighted.forEach(el => {
+        el.classList.remove("highlight-last-move");
+    });
 
+    lastHighlighted = [];
+
+    const fromSquare = document.querySelector(`[data-row="${fromRow}"][data-col="${fromCol}"]`);
+    const toSquare = document.querySelector(`[data-row="${toRow}"][data-col="${toCol}"]`);
+
+    if (fromSquare && toSquare) {
+        fromSquare.classList.add("highlight-last-move");
+        toSquare.classList.add("highlight-last-move");
+
+        lastHighlighted.push(fromSquare, toSquare);
+    }
+}
         let dragging = false;
         let dragSrc = null;
 
@@ -867,6 +884,7 @@
                     board = data.board;
                     turn  = data.current_turn;
                     lastMove = { from: [fr, fc], to: [tr, tc] };
+                    highlightMove(fr, fc, tr, tc);
                     
                     whiteTime = data.white_time;
                     blackTime = data.black_time;
