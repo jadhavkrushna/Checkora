@@ -293,6 +293,13 @@ class ChessGame:
         # Check for checkmate / stalemate / check
         game_status = self.check_game_status()
         
+        if game_status == 'check':
+            self.move_history[-1]['notation'] += '+'
+            notation += '+'
+        elif game_status == 'checkmate':
+            self.move_history[-1]['notation'] += '#'
+            notation += '#'
+        
         return True, notation, captured, game_status
 
     def get_valid_moves(self, row, col):
@@ -385,8 +392,24 @@ class ChessGame:
         return (piece == 'P' and tr == 0) or (piece == 'p' and tr == 7)
 
     def _notation(self, fr, fc, tr, tc, piece, captured):
-        to_sq = f"{self.FILES[fc]}{8 - fr} -> {self.FILES[tc]}{8 - tr}"
-        return to_sq
+        # Castling
+        if piece.lower() == 'k' and abs(tc - fc) == 2:
+            return "O-O" if tc > fc else "O-O-O"
+
+        dest = f"{self.FILES[tc]}{8 - tr}"
+
+        # Pawn moves
+        if piece.lower() == 'p':
+            is_capture = (captured is not None) or (tc != fc)
+            if is_capture:
+                return f"{self.FILES[fc]}x{dest}"
+            else:
+                return dest
+        
+        # Piece moves
+        p_str = piece.upper()
+        cap_str = "x" if captured is not None else ""
+        return f"{p_str}{cap_str}{dest}"
 
     @staticmethod
     def _color(piece):
