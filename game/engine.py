@@ -1,12 +1,23 @@
 """Checkora Game Manager.
 
 Manages chess game state and coordinates with the C++ engine for move
-validation. Includes a persistent DP table (valid_moves_cache) that 
+validation. Includes a persistent DP table (valid_moves_cache) that
 updates on-demand to avoid redundant brute-force calculations while
 ensuring 100% accuracy.
+
+Opening Book
+------------
+During the first few moves the AI consults a pre-built opening book
+(``game/engine/opening_book.json``) instead of running the expensive
+minimax search.  Keys are minimal FEN strings (board layout + side to
+move + castling rights, **no** en-passant / half-move / full-move
+counters) and values are lists of ``[from_row, from_col, to_row,
+to_col]`` move coordinates.  When multiple book moves are available one
+is chosen at random to add variety.
 """
 
 import os
+import random
 import subprocess
 import json
 import sys
@@ -34,6 +45,12 @@ class ChessGame:
         ]
     )
     FILES = 'abcdefgh'
+
+    # Path to the JSON opening book
+    OPENING_BOOK_PATH = os.path.join(ENGINE_DIR, 'opening_book.json')
+
+    # Class-level cache so the file is read only once per process
+    _opening_book: dict | None = None
 
     INITIAL_BOARD = [
         ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
@@ -412,6 +429,83 @@ class ChessGame:
         return 'ok'
 
     # ------------------------------------------------------------------
+    #  AI -- Opening Book
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def _load_opening_book(cls) -> dict:
+        """Load the opening book JSON from disk (cached after first load)."""
+        if cls._opening_book is None:
+            try:
+                with open(cls.OPENING_BOOK_PATH, encoding='utf-8') as fh:
+                    cls._opening_book = json.load(fh)
+            except (OSError, json.JSONDecodeError):
+                cls._opening_book = {}  # Graceful fallback: no book
+        return cls._opening_book
+
+    def generate_fen_key(self) -> str:
+        """Build a minimal FEN key (board + side + castling, no counters).
+
+        This matches the key format used in ``opening_book.json``.
+        """
+        # Piece-placement section
+        fen_rows = []
+        for row in self.board:
+            empty = 0
+            row_str = ''
+            for piece in row:
+                if piece is None:
+                    empty += 1
+                else:
+                    if empty:
+                        row_str += str(empty)
+                        empty = 0
+                    row_str += piece
+            if empty:
+                row_str += str(empty)
+            fen_rows.append(row_str)
+        placement = '/'.join(fen_rows)
+
+        # Side to move
+        side = 'w' if self.current_turn == 'white' else 'b'
+
+        # Castling rights
+        castling = self.serialize_castling_rights()  # already returns '-' if none
+
+        return f"{placement} {side} {castling}"
+
+    def get_opening_book_move(self) -> dict | None:
+        """Return a random book move for the current position, or ``None``.
+
+        The move is validated against the engine before being returned so
+        the AI never plays an illegal book move.
+        """
+        book = self._load_opening_book()
+        fen_key = self.generate_fen_key()
+        candidates = book.get(fen_key)
+        if not candidates:
+            return None
+
+        # Shuffle so variety is uniform across the candidate list
+        candidates = list(candidates)  # copy – do not mutate the book
+        random.shuffle(candidates)
+
+        for move in candidates:
+            if len(move) != 4:
+                continue
+            fr, fc, tr, tc = move
+            is_valid, _ = self.validate_move(fr, fc, tr, tc)
+            if is_valid:
+                return {
+                    'from_row': fr,
+                    'from_col': fc,
+                    'to_row': tr,
+                    'to_col': tc,
+                }
+
+        return None  # No valid book move found
+
+    # ------------------------------------------------------------------
     #  AI -- Minimax via C++ engine
     # ------------------------------------------------------------------
 
@@ -419,11 +513,21 @@ class ChessGame:
     AI_SEARCH_DEPTH_PYTHON = 3  # Python engine needs conservative depth
 
     def get_ai_move(self):
-        """Ask the C++ engine to compute the best move using minimax.
+        """Return the best move for the current position.
+
+        Checks the opening book first for an instant theory response.
+        Falls back to the C++ minimax engine when the position is not
+        in the book or the book move fails validation.
 
         Returns a dict with from/to coordinates, or None when no
         legal move exists (checkmate / stalemate).
         """
+        # 1. Opening-book lookup (fast path)
+        book_move = self.get_opening_book_move()
+        if book_move:
+            return book_move
+
+        # 2. Minimax search (slow path)
         board_str = self.serialize_board()
         rights_str = self.serialize_castling_rights()
         depth = self._get_ai_search_depth()

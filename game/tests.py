@@ -334,5 +334,186 @@ class AIMoveTest(TestCase):
         data = r.json()
         self.assertTrue(data['valid'])
         self.assertEqual(data['current_turn'], 'black')
-        self.assertEqual(data['ai_move']['from_row'], 6)
-        self.assertEqual(data['ai_move']['to_row'], 4)
+        # The opening book (or engine) picks the move; just verify coordinates are present
+        self.assertIn('from_row', data['ai_move'])
+        self.assertIn('from_col', data['ai_move'])
+        self.assertIn('to_row', data['ai_move'])
+        self.assertIn('to_col', data['ai_move'])
+
+
+
+class OpeningBookTest(SimpleTestCase):
+    """Unit tests for the opening-book integration in ChessGame."""
+
+    # ------------------------------------------------------------------
+    # FEN key generation
+    # ------------------------------------------------------------------
+
+    def test_fen_key_starting_position(self):
+        """Starting position must produce the correct standard FEN key."""
+        game = ChessGame()
+        key = game.generate_fen_key()
+        self.assertEqual(
+            key,
+            'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq',
+        )
+
+    def test_fen_key_side_switches_after_move(self):
+        """After white moves the key should show 'b' as the active side."""
+        game = ChessGame()
+        game.current_turn = 'black'
+        key = game.generate_fen_key()
+        self.assertIn(' b ', key)
+
+    def test_fen_key_reflects_castling_rights_loss(self):
+        """Losing castling rights must be reflected in the FEN key."""
+        game = ChessGame()
+        game.castling_rights = {'w_k': False, 'w_q': False, 'b_k': False, 'b_q': False}
+        key = game.generate_fen_key()
+        self.assertTrue(key.endswith(' -'))
+
+    def test_fen_key_empty_board_row_uses_digit(self):
+        """An entirely empty rank must produce '8' not eight dots."""
+        game = ChessGame()
+        key = game.generate_fen_key()
+        # Ranks 3-6 (0-indexed 2-5) are empty at start → four '8' segments
+        self.assertIn('/8/', key)
+
+    # ------------------------------------------------------------------
+    # Book loading
+    # ------------------------------------------------------------------
+
+    def test_book_loads_from_json_file(self):
+        """The book file must be loadable and return a non-empty dict."""
+        # Reset the class-level cache so the real file is read
+        ChessGame._opening_book = None
+        book = ChessGame._load_opening_book()
+        self.assertIsInstance(book, dict)
+        self.assertGreater(len(book), 0)
+
+    def test_book_caches_after_first_load(self):
+        """Subsequent calls must return the same object (no re-read)."""
+        ChessGame._opening_book = None
+        book1 = ChessGame._load_opening_book()
+        book2 = ChessGame._load_opening_book()
+        self.assertIs(book1, book2)
+
+    def test_book_falls_back_gracefully_on_missing_file(self):
+        """A missing book file should produce an empty dict, not a crash."""
+        ChessGame._opening_book = None
+        with mock.patch.object(ChessGame, 'OPENING_BOOK_PATH', '/nonexistent/path.json'):
+            book = ChessGame._load_opening_book()
+        self.assertEqual(book, {})
+        # Restore so other tests use the real book
+        ChessGame._opening_book = None
+
+    # ------------------------------------------------------------------
+    # get_opening_book_move
+    # ------------------------------------------------------------------
+
+    def test_starting_position_returns_book_move(self):
+        """At the start of the game a valid book move should be returned."""
+        game = ChessGame()
+        ChessGame._opening_book = None
+
+        with mock.patch.object(ChessGame, 'validate_move', return_value=(True, 'ok')):
+            move = game.get_opening_book_move()
+
+        self.assertIsNotNone(move, 'Expected a book move for the starting position')
+        self.assertIn('from_row', move)
+        self.assertIn('from_col', move)
+        self.assertIn('to_row', move)
+        self.assertIn('to_col', move)
+
+    def test_unknown_position_returns_none(self):
+        """An out-of-book position must return None (fall through to engine)."""
+        game = ChessGame()
+        # Force a book with no matching key
+        ChessGame._opening_book = {}
+
+        move = game.get_opening_book_move()
+        self.assertIsNone(move)
+        # Restore
+        ChessGame._opening_book = None
+
+    def test_illegal_book_moves_are_skipped(self):
+        """If validate_move rejects all candidates the result is None."""
+        game = ChessGame()
+        ChessGame._opening_book = {
+            game.generate_fen_key(): [[6, 4, 4, 4]],
+        }
+
+        with mock.patch.object(ChessGame, 'validate_move', return_value=(False, 'illegal')):
+            move = game.get_opening_book_move()
+
+        self.assertIsNone(move)
+        ChessGame._opening_book = None
+
+    def test_first_legal_candidate_returned_when_first_is_illegal(self):
+        """The first *legal* candidate is returned even if earlier ones fail."""
+        game = ChessGame()
+        fen = game.generate_fen_key()
+        ChessGame._opening_book = {
+            fen: [[9, 9, 9, 9], [6, 4, 4, 4]],  # first entry invalid coords
+        }
+
+        def fake_validate(fr, fc, tr, tc):
+            return (True, 'ok') if [fr, fc, tr, tc] == [6, 4, 4, 4] else (False, 'bad')
+
+        with mock.patch.object(ChessGame, 'validate_move', side_effect=fake_validate):
+            move = game.get_opening_book_move()
+
+        self.assertIsNotNone(move)
+        self.assertEqual([move['from_row'], move['from_col'], move['to_row'], move['to_col']],
+                         [6, 4, 4, 4])
+        ChessGame._opening_book = None
+
+    def test_book_moves_show_variety(self):
+        """With multiple candidates different moves should be chosen over many calls."""
+        game = ChessGame()
+        fen = game.generate_fen_key()
+        ChessGame._opening_book = {
+            fen: [[6, 4, 4, 4], [6, 3, 4, 3], [7, 6, 5, 5]],
+        }
+        seen = set()
+        with mock.patch.object(ChessGame, 'validate_move', return_value=(True, 'ok')):
+            for _ in range(60):
+                m = game.get_opening_book_move()
+                if m:
+                    seen.add((m['from_row'], m['from_col'], m['to_row'], m['to_col']))
+
+        self.assertGreater(len(seen), 1, 'Book should produce variety across 60 calls')
+        ChessGame._opening_book = None
+
+    # ------------------------------------------------------------------
+    # Integration: get_ai_move uses book on first move
+    # ------------------------------------------------------------------
+
+    def test_get_ai_move_uses_book_before_engine(self):
+        """get_ai_move() must return the book move without calling the engine."""
+        game = ChessGame()
+        ChessGame._opening_book = None
+
+        with (
+            mock.patch.object(ChessGame, 'validate_move', return_value=(True, 'ok')),
+            mock.patch.object(ChessGame, '_call_engine') as mock_engine,
+        ):
+            move = game.get_ai_move()
+
+        mock_engine.assert_not_called()
+        self.assertIsNotNone(move)
+        ChessGame._opening_book = None
+
+    def test_get_ai_move_falls_back_to_engine_when_book_empty(self):
+        """When the book has no entry the engine must be consulted."""
+        game = ChessGame()
+        ChessGame._opening_book = {}  # empty book
+
+        with mock.patch.object(ChessGame, '_call_engine', return_value='BESTMOVE 6 4 4 4') as mock_engine:
+            move = game.get_ai_move()
+
+        mock_engine.assert_called_once()
+        self.assertIsNotNone(move)
+        self.assertEqual(move['from_row'], 6)
+        self.assertEqual(move['to_row'], 4)
+        ChessGame._opening_book = None
