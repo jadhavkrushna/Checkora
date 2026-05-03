@@ -186,8 +186,8 @@
         }
 
         /* ============================================================
-   Board Themes
-   ============================================================ */
+           Board Themes
+           ============================================================ */
         :root {
             --light-square: #eeeed2;
             --dark-square: #769656;
@@ -227,8 +227,8 @@
         }
 
         /* ============================================================
-   Theme Switcher
-   ============================================================ */
+           Theme Switcher
+           ============================================================ */
         .theme-switcher {
             display: flex;
             gap: 8px;
@@ -609,13 +609,24 @@
         window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
     </script>
     <script defer src="/_vercel/insights/script.js"></script>
+
+    <script>
+        (function () {
+            const VALID_THEMES = ['classic', 'dark', 'green', 'blue'];
+            let saved = 'classic';
+            try { saved = localStorage.getItem('chessBoardTheme') || 'classic'; } catch (e) {}
+            if (!VALID_THEMES.includes(saved)) saved = 'classic';
+            document.documentElement.setAttribute('data-theme', saved);
+        })();
+    </script>
+
 </head>
 
 <body>
 
     <!-- ========== WELCOME MESSAGE ========== -->
 
-    <div class="promo-overlay active" id="welcomeOverlay" style="background: #0f0f1a; z-index: 9999;">
+    <div class="promo-overlay active" id="welcomeOverlay" style="background: var(--page-bg); z-index: 9999;">
         <div class="promo-dialog" style="min-width: 320px; padding: 35px;">
             <div class="promo-title" style="font-size: 1.6rem; color: #fff; margin-bottom: 10px;">Checkora</div>
             <p style="color: #aaa; margin-bottom: 30px; font-size: 0.95rem;">Select a game mode to start playing.</p>
@@ -700,6 +711,9 @@
                         aria-pressed="false" type="button"></button>
                     <button class="theme-btn" data-theme="blue" title="Blue" aria-label="Blue theme"
                         aria-pressed="false" type="button"></button>
+                </div>
+                <div style="margin-top: 8px; font-size: 11px; color: rgba(255,255,255,0.5); text-align: center;">
+                    Classic · Dark · Green · Blue
                 </div>
             </div>
             <div class="card">
@@ -1457,14 +1471,7 @@
                 });
             });
 
-            let savedTheme = 'classic';
-            try {
-                savedTheme = localStorage.getItem('chessBoardTheme') || 'classic';
-            } catch (e) {
-                // localStorage unavailable, use default
-            }
-            setTheme(savedTheme);
-
+            
             /* ==========================================================
             INIT (Game yahan se shuru hota hai)
             ========================================================== */
