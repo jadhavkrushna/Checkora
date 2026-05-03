@@ -5,7 +5,7 @@
   "outputDirectory": "public",
   "functions": {
     "api/wsgi.py": {
-      "includeFiles": ["game/**", "staticfiles/**"]
+      "includeFiles": "{game/**,staticfiles/**}"
     }
   },
   "rewrites": [
