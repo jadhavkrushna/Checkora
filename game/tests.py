@@ -341,7 +341,6 @@ class AIMoveTest(TestCase):
         self.assertIn('to_col', data['ai_move'])
 
 
-
 class OpeningBookTest(SimpleTestCase):
     """Unit tests for the opening-book integration in ChessGame."""
 
