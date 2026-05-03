@@ -448,12 +448,27 @@ class OpeningBookTest(SimpleTestCase):
         self.assertIsNone(move)
         ChessGame._opening_book = None
 
-    def test_first_legal_candidate_returned_when_first_is_illegal(self):
-        """The first *legal* candidate is returned even if earlier ones fail."""
+    def test_out_of_range_coords_skipped_without_calling_validate(self):
+        """Out-of-range entries must be rejected by the bounds check alone.
+
+        validate_move is NOT mocked here — if the bounds check were missing,
+        board[9][9] would raise IndexError and the test would fail.
+        """
+        game = ChessGame()
+        ChessGame._opening_book = {
+            game.generate_fen_key(): [[9, 9, 9, 9]],  # out-of-range only
+        }
+        # No mock — real validate_move would IndexError without the guard
+        move = game.get_opening_book_move()
+        self.assertIsNone(move)
+        ChessGame._opening_book = None
+
+    def test_first_legal_candidate_returned_when_first_is_malformed(self):
+        """A valid second candidate is returned after a malformed first entry."""
         game = ChessGame()
         fen = game.generate_fen_key()
         ChessGame._opening_book = {
-            fen: [[9, 9, 9, 9], [6, 4, 4, 4]],  # first entry invalid coords
+            fen: [[9, 9, 9, 9], [6, 4, 4, 4]],  # first entry out-of-range
         }
 
         def fake_validate(fr, fc, tr, tc):
@@ -463,9 +478,12 @@ class OpeningBookTest(SimpleTestCase):
             move = game.get_opening_book_move()
 
         self.assertIsNotNone(move)
-        self.assertEqual([move['from_row'], move['from_col'], move['to_row'], move['to_col']],
-                         [6, 4, 4, 4])
+        self.assertEqual(
+            [move['from_row'], move['from_col'], move['to_row'], move['to_col']],
+            [6, 4, 4, 4],
+        )
         ChessGame._opening_book = None
+
 
     def test_book_moves_show_variety(self):
         """With multiple candidates different moves should be chosen over many calls."""

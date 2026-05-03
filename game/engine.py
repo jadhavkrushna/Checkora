@@ -491,7 +491,14 @@ class ChessGame:
         random.shuffle(candidates)
 
         for move in candidates:
-            if len(move) != 4:
+            # Sanity-check: must be a 4-item sequence of ints, all in 0..7.
+            # This prevents IndexError inside validate_move if the JSON ever
+            # contains malformed entries like [9, 9, 9, 9].
+            if (
+                not isinstance(move, (list, tuple))
+                or len(move) != 4
+                or not all(isinstance(c, int) and 0 <= c <= 7 for c in move)
+            ):
                 continue
             fr, fc, tr, tc = move
             is_valid, _ = self.validate_move(fr, fc, tr, tc)
