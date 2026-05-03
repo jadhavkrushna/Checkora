@@ -104,7 +104,7 @@ class ChessGame:
             'mode': self.mode,
             'castling_rights': self.castling_rights,
             'en_passant_target': self.en_passant_target,
-            'player_color': self.player_color
+            'player_color': self.player_color,
         }
 
     @classmethod

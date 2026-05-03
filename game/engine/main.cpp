@@ -821,6 +821,7 @@ void handleNotation(const string &turn, int fr, int fc, int tr, int tc) {
         }
         res += files[static_cast<string::size_type>(tc)];
         res += to_string(8 - tr);
+
     } else {
         res += static_cast<char>(toupper(static_cast<unsigned char>(type)));
 
