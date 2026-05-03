@@ -219,10 +219,8 @@ class ChessGame:
         ep_before = self._serialize_ep()
 
         # Detect En Passant capture before moving piece
-        is_ep_capture = False
         if piece.lower() == 'p' and fc != tc and not captured:
             if self.en_passant_target and tr == self.en_passant_target[0] and tc == self.en_passant_target[1]:
-                is_ep_capture = True
                 captured = 'p' if piece.isupper() else 'P' # The captured piece is of opposite color
                 # In EP, the captured pawn is at (fr, tc)
                 self.board[fr][tc] = None
