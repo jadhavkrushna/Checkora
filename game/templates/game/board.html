@@ -90,7 +90,7 @@
     </div>
 
     <!-- ========== GAME ========== -->
-    <div class="game-layout">
+    <div class="game-layout" style="visibility: hidden;">
 
         <!-- Left Panel -->
         <div class="panel">
@@ -287,6 +287,7 @@
             const modeBadge = document.getElementById('modeBadge');
             const autoFlipBtn = document.getElementById('autoFlipBtn');
             const flipControls = document.getElementById('flipControls');
+            const copyFenBtn = document.getElementById('copyFenBtn');
 
             const welcomeOverlay = document.getElementById('welcomeOverlay');
             const welcomeResumeBtn = document.getElementById('welcomeResumeBtn');
@@ -297,6 +298,7 @@
             const pveOptions = document.getElementById('pveOptions');
             const startAIBtn = document.getElementById('startAIBtn');
             const backToModes = document.getElementById('backToModes');
+            const gameLayout = document.querySelector('.game-layout');
 
             const confirmOverlay = document.getElementById('confirmOverlay');
             const confirmTitle = document.getElementById('confirmTitle');
@@ -915,7 +917,11 @@
             ========================================================== */
             let selectedPveColor = 'white';
 
-            if (welcomePvPBtn) welcomePvPBtn.onclick = () => { welcomeOverlay.classList.remove('active'); startNewGame('pvp'); };
+            if (welcomePvPBtn) welcomePvPBtn.onclick = () => { 
+                welcomeOverlay.classList.remove('active'); 
+                gameLayout.style.visibility = 'visible';
+                startNewGame('pvp'); 
+            };
             
             if (welcomeAIBtn) welcomeAIBtn.onclick = () => {
                 nameInputs.style.display = 'none';
@@ -944,6 +950,7 @@
 
             if (startAIBtn) startAIBtn.onclick = () => {
                 welcomeOverlay.classList.remove('active');
+                gameLayout.style.visibility = 'visible';
                 startNewGame('ai', selectedPveColor);
             };
 
@@ -957,8 +964,19 @@
                 }
             };
 
+            if (copyFenBtn) copyFenBtn.onclick = async () => {
+                const data = await get('/api/get-state/');
+                if (data.fen) {
+                    navigator.clipboard.writeText(data.fen);
+                    const oldText = copyFenBtn.textContent;
+                    copyFenBtn.textContent = 'Copied!';
+                    setTimeout(() => copyFenBtn.textContent = oldText, 2000);
+                }
+            };
+
             if (welcomeResumeBtn) welcomeResumeBtn.onclick = () => {
                 welcomeOverlay.classList.remove('active');
+                gameLayout.style.visibility = 'visible';
                 if (paused) resumeGame();
             };
 
@@ -996,6 +1014,27 @@
 
             if (gameOverPvPBtn) gameOverPvPBtn.onclick = () => { gameOverOverlay.classList.remove('active'); startNewGame('pvp'); };
             if (gameOverAIBtn) gameOverAIBtn.onclick = () => { gameOverOverlay.classList.remove('active'); startNewGame('ai'); };
+
+            // Theme Switcher
+            const themeBtns = document.querySelectorAll('.theme-btn');
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'classic';
+            themeBtns.forEach(btn => {
+                if (btn.dataset.theme === currentTheme) {
+                    btn.classList.add('active');
+                    btn.setAttribute('aria-pressed', 'true');
+                }
+                btn.onclick = () => {
+                    const theme = btn.dataset.theme;
+                    document.documentElement.setAttribute('data-theme', theme);
+                    localStorage.setItem('chessBoardTheme', theme);
+                    themeBtns.forEach(b => {
+                        b.classList.remove('active');
+                        b.setAttribute('aria-pressed', 'false');
+                    });
+                    btn.classList.add('active');
+                    btn.setAttribute('aria-pressed', 'true');
+                };
+            });
 
             document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
             window.addEventListener('beforeunload', () => {
