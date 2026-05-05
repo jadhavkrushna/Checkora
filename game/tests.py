@@ -615,3 +615,56 @@ class OpeningBookTest(SimpleTestCase):
         self.assertEqual(move['from_row'], 6)
         self.assertEqual(move['to_row'], 4)
         ChessGame._opening_book = None
+
+
+class UndoMoveTest(TestCase):
+    """Test the /api/undo/ endpoint."""
+
+    def setUp(self):
+        self.client.get('/')
+        self.client.post(
+            '/api/new-game/',
+            data=json.dumps({'mode': 'ai', 'player_color': 'white'}),
+            content_type='application/json',
+        )
+
+        self.validate_patcher = mock.patch.object(ChessGame, 'validate_move', return_value=(True, 'ok'))
+        self.validate_patcher.start()
+        self.engine_patcher = mock.patch.object(ChessGame, '_call_engine', return_value='STATUS ok')
+        self.engine_patcher.start()
+
+    def tearDown(self):
+        self.validate_patcher.stop()
+        self.engine_patcher.stop()
+
+    def _make_two_moves(self):
+        """Play e4 then e5 through the API to build a 2-move history."""
+        self.client.post(
+            '/api/move/',
+            data=json.dumps({'from_row': 6, 'from_col': 4, 'to_row': 4, 'to_col': 4}),
+            content_type='application/json',
+        )
+        self.client.post(
+            '/api/move/',
+            data=json.dumps({'from_row': 1, 'from_col': 4, 'to_row': 3, 'to_col': 4}),
+            content_type='application/json',
+        )
+
+    def test_undo_rejected_in_pvp_mode(self):
+        self.client.post('/api/new-game/', data=json.dumps({'mode': 'pvp'}), content_type='application/json')
+        r = self.client.post('/api/undo/', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(r.json()['valid'])
+
+    def test_undo_rejected_with_fewer_than_two_moves(self):
+        r = self.client.post('/api/undo/', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(r.json()['valid'])
+
+    def test_undo_removes_last_two_moves(self):
+        self._make_two_moves()
+        r = self.client.post('/api/undo/', content_type='application/json')
+        data = r.json()
+        self.assertTrue(data['valid'])
+        self.assertEqual(len(data['move_history']), 0)
+        self.assertEqual(data['current_turn'], 'white')

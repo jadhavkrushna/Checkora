@@ -115,15 +115,18 @@ class ChessGame:
     @classmethod
     def from_dict(cls, data):
         """Restore a game from a session dictionary."""
+        if not isinstance(data, dict):
+            return cls()
+
         game = cls.__new__(cls)
-        game.board = data['board']
-        game.current_turn = data['current_turn']
+        game.board = data.get('board', [row[:] for row in cls.INITIAL_BOARD])
+        game.current_turn = data.get('current_turn', 'white')
         game.move_history = data.get('move_history', [])
         game.captured = data.get('captured', {'white': [], 'black': []})
         game.paused = data.get('paused', False)
-        game.white_time = data['white_time']
-        game.black_time = data['black_time']
-        game.last_ts = data['last_ts']
+        game.white_time = data.get('white_time', 600)
+        game.black_time = data.get('black_time', 600)
+        game.last_ts = data.get('last_ts', time.time())
         game.mode = data.get('mode', 'pvp')
         game.player_color = data.get('player_color', 'white')
         game.castling_rights = data.get('castling_rights', {'w_k': True, 'w_q': True, 'b_k': True, 'b_q': True})
@@ -265,6 +268,8 @@ class ChessGame:
 
     def validate_move(self, fr, fc, tr, tc):
         """Check if move is in our DP cache."""
+        if not self._is_valid_coords(fr, fc, tr, tc):
+            return False, "Invalid coordinates."
         moves = self.get_valid_moves(fr, fc)
         for m in moves:
             if m['row'] == tr and m['col'] == tc:
@@ -273,6 +278,8 @@ class ChessGame:
 
     def make_move(self, fr, fc, tr, tc, promotion_piece=None):
         """Execute move and invalidate cache to ensure fresh calculations."""
+        if not self._is_valid_coords(fr, fc, tr, tc):
+            return False, "Invalid coordinates.", None, 'active'
         piece = self.board[fr][fc]
         if not piece or self._color(piece) != self.current_turn:
             return False, "Not your piece or empty square", None, 'active'
@@ -406,6 +413,8 @@ class ChessGame:
 
     def get_valid_moves(self, row, col):
         """Return legal moves from DP cache (fetches from engine if missing)."""
+        if not self._is_valid_coords(row, col):
+            return []
         piece = self.board[row][col]
         if not piece or self._color(piece) != self.current_turn:
             return []
@@ -488,8 +497,10 @@ class ChessGame:
         return choice.upper() if piece.isupper() else choice.lower()
 
     @staticmethod
-    def is_promotion_move(board, fr, fc, tr):
+    def is_promotion_move(board, fr, fc, tr, tc):
         """Public helper: check if a planned move would trigger promotion."""
+        if not ChessGame._is_valid_coords(fr, fc, tr, tc):
+            return False
         piece = board[fr][fc]
         if not piece:
             return False
@@ -691,4 +702,16 @@ class ChessGame:
             'to_row':   int(parts[3]),
             'to_col':   int(parts[4]),
         }
+
+    # ------------------------------------------------------------------
+    #  Validation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_valid_coords(*coords):
+        """Return True if all coordinates are integers within [0, 7]."""
+        for c in coords:
+            if not isinstance(c, int) or not (0 <= c <= 7):
+                return False
+        return True
 

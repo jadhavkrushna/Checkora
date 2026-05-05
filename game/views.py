@@ -97,9 +97,12 @@ def valid_moves(request):
 @require_POST
 def new_game(request):
     """Reset the game to the initial position with selected mode."""
-    data = json.loads(request.body or '{}')
-    mode = data.get('mode', 'pvp')
-    difficulty = data.get('difficulty', 'medium')
+    try:
+        data = json.loads(request.body or '{}')
+        mode = data.get('mode', 'pvp')
+        difficulty = data.get('difficulty', 'medium')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Malformed JSON payload.'}, status=400)
     
     if mode not in ('pvp', 'ai'):
         mode = 'pvp'
@@ -204,8 +207,11 @@ def set_pause(request):
     if not game_data:
         return JsonResponse({'paused': False})
 
-    data = json.loads(request.body or '{}')
-    pause = data.get('pause', True)
+    try:
+        data = json.loads(request.body or '{}')
+        pause = data.get('pause', True)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Malformed JSON payload.'}, status=400)
 
     game = ChessGame.from_dict(game_data)
 
@@ -292,8 +298,11 @@ def offer_draw(request):
             {'success': False, 'message': err_msg}, status=400
         )
 
-    data = json.loads(request.body or '{}')
-    action = data.get('action')  # 'offer' or 'accept'
+    try:
+        data = json.loads(request.body or '{}')
+        action = data.get('action')  # 'offer' or 'accept'
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Malformed JSON payload.'}, status=400)
 
     if action == 'accept':
         game_data['game_status'] = 'draw_agreement'
@@ -302,6 +311,56 @@ def offer_draw(request):
         return JsonResponse({'success': True, 'game_status': 'draw_agreement'})
         
     return JsonResponse({'success': True})
+
+
+@require_POST
+def undo_move(request):
+    """Revert the last player+AI move pair in AI mode."""
+    game_data = request.session.get('game')
+    if not game_data:
+        return JsonResponse({'valid': False, 'message': 'No active game.'}, status=400)
+
+    if game_data.get('mode') != 'ai':
+        return JsonResponse({'valid': False, 'message': 'Undo is only available in AI mode.'}, status=400)
+
+    history = list(game_data.get('move_history', []))
+    if len(history) < 2:
+        return JsonResponse({'valid': False, 'message': 'Not enough moves to undo.'}, status=400)
+
+    # Drop the last two entries (AI move + player move before it)
+    moves_to_replay = history[:-2]
+
+    # Rebuild by replaying from initial position
+    game = ChessGame()
+    game.mode = game_data.get('mode', 'ai')
+    game.player_color = game_data.get('player_color', 'white')
+
+    for entry in moves_to_replay:
+        fr_fc = entry.get('from') or entry.get('from_sq')
+        tr_tc = entry.get('to') or entry.get('to_sq')
+        if not fr_fc or not tr_tc:
+            continue
+        fr, fc = fr_fc
+        tr, tc = tr_tc
+        promoted_to = entry.get('promoted_to')
+        promotion_piece = promoted_to.lower() if promoted_to else None
+        game.make_move(fr, fc, tr, tc, promotion_piece)
+
+    request.session['game'] = game.to_dict()
+    request.session.modified = True
+
+    return JsonResponse({
+        'valid': True,
+        'board': game.board,
+        'current_turn': game.current_turn,
+        'white_time': game_data.get('white_time', 600),
+        'black_time': game_data.get('black_time', 600),
+        'move_history': game.move_history,
+        'captured_pieces': game.captured,
+        'white_name': request.session.get('white_name', 'White'),
+        'black_name': request.session.get('black_name', 'Black'),
+        'fen': game.generate_fen_key(),
+    })
 
 
 @require_POST

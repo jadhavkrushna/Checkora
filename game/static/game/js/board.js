@@ -73,6 +73,7 @@
             const gameOverAIBtn = document.getElementById('gameOverAIBtn');
 
             const resignBtn = document.getElementById('resignBtn');
+            const undoBtn = document.getElementById('undoBtn');
             const drawBtn = document.getElementById('drawBtn');
             const drawOverlay = document.getElementById('drawOverlay');
             const drawMessage = document.getElementById('drawMessage');
@@ -171,6 +172,7 @@
                 }
 
                 if (drawBtn) drawBtn.style.display = gameMode === 'pvp' ? 'block' : 'none';
+                if (undoBtn) undoBtn.style.display = gameMode === 'ai' ? 'block' : 'none';
 
                 updatePlayerNames(data);
                 updateTurn();
@@ -867,6 +869,30 @@
             if (resignBtn) resignBtn.onclick = () => {
                 if (!gameOver && !paused) {
                     showConfirm("Resign?", "Are you sure you want to resign?", () => endGame('resign', turn));
+                }
+            };
+
+            if (undoBtn) undoBtn.onclick = async () => {
+                if (gameOver || gameMode !== 'ai') return;
+                try {
+                    const data = await post('/api/undo/', {});
+                    if (data.valid) {
+                        board = parseBoard(data.board);
+                        turn = data.current_turn;
+                        lastMove = null;
+                        selected = null;
+                        hints = [];
+                        updatePlayerNames(data);
+                        updateTurn();
+                        updateMoves(data.move_history);
+                        updateCaptured(data.captured_pieces);
+                        syncPieces();
+                        showStatus('Move undone.', false);
+                    } else {
+                        showStatus(data.message, true);
+                    }
+                } catch (e) {
+                    showStatus('Connection error.', true);
                 }
             };
 
