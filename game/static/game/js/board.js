@@ -1050,6 +1050,9 @@
                     }
                 }
             
+            const wName = (document.getElementById('whiteNameInput')?.value || 'White').trim().slice(0, 17);
+            const bName = (document.getElementById('blackNameInput')?.value || 'Black').trim().slice(0, 17);
+
                 const d = await post('/api/new-game/', {
                     mode: mode,
                     player_color: pColor,
