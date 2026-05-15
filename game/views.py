@@ -601,6 +601,7 @@ def logout_view(request):
     return redirect('landing')
 
 
+# Protect the stats page with login requirement
 @login_required
 def stats_view(request):
     """Display game statistics."""
