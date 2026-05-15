@@ -14,13 +14,12 @@ from django.contrib.auth.forms import AuthenticationForm
 from smtplib import SMTPException
 from django.core.mail import BadHeaderError, send_mail
 from django.contrib import messages
-from django.db.models import F
+from django.db.models import F, Q
 
 from .forms import CustomUserCreationForm
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
 
 from .engine import ChessGame
 from .models import GameResult
@@ -550,7 +549,9 @@ def logout_view(request):
 def stats_view(request):
     """Display game statistics."""
     # Only show real database records linked to the logged-in user
-    user_results = GameResult.objects.filter(user=request.user).exclude(mode__in=['', None])
+    user_results = GameResult.objects.filter(
+        user=request.user
+    ).exclude(mode__in=['', None])
 
     recent = user_results.order_by('-played_at')[:20]
     ai_results = user_results.filter(mode='ai')
@@ -559,11 +560,15 @@ def stats_view(request):
     user_ai_wins = ai_results.filter(winner=F('player_color')).count()
     # If winner != player_color and not a draw, the AI won
     ai_wins = ai_results.filter(
-        Q(winner='white', player_color='black') | Q(winner='black', player_color='white')
+        Q(winner='white', player_color='black') |
+        Q(winner='black', player_color='white')
     ).count()
 
     ai_draws = ai_results.filter(winner='draw').count()
     ai_total = ai_results.count()
+
+    # Handle explicit edge cases (e.g. division by zero for win rate)
+    win_percentage = (user_ai_wins / ai_total * 100) if ai_total > 0 else 0
 
     return render(request, 'game/stats.html', {
         'recent': recent,
@@ -571,4 +576,5 @@ def stats_view(request):
         'user_ai_wins': user_ai_wins,
         'ai_wins': ai_wins,
         'ai_draws': ai_draws,
+        'win_percentage': round(win_percentage, 2),
     })
