@@ -465,17 +465,34 @@
                 let bName = data.black_name || 'Black';
                 
                 if (gameMode === 'ai'){
-                    // Fixing the naming system
-                    let player_name = data.white_name;
+                    const diffLabel = (currentDifficulty || 'medium').toUpperCase();
+                    const player_name = playerColor === 'white' ? data.white_name : data.black_name;
                     if(playerColor === 'white'){
                         wName = player_name;
-                        bName = 'AI (Black)';
+                        bName = `AI (Black)`;
                     }else{
                         bName = player_name;
-                        wName = 'AI (White)';
-                    }
-                }
+                        wName = `AI (White)`;
 
+                    }
+                
+                    // Inject difficulty badge after names are set
+                    setTimeout(() => {
+                        const aiLabel = playerColor === 'white'
+                            ? document.getElementById('blackNameLabel')
+                            : document.getElementById('whiteNameLabel');
+                        if (aiLabel) {
+                            aiLabel.innerHTML = '';
+                            const textNode = document.createTextNode(`AI (${playerColor === 'white' ? 'BLACK' : 'WHITE'}) `);
+                            const badge = document.createElement('span');
+                            badge.textContent = diffLabel;
+                            badge.style.cssText = 'color:#f0c040 !important; font-weight:700; font-size:1.20em; letter-spacing:1px;';
+                            badge.setAttribute('aria-label', `AI difficulty: ${diffLabel}`);
+                            aiLabel.appendChild(textNode);
+                            aiLabel.appendChild(badge);
+                        }
+                    }, 0);
+                }
                 if (whiteNameLabel) whiteNameLabel.textContent = wName.toUpperCase();
                 if (blackNameLabel) blackNameLabel.textContent = bName.toUpperCase();
                 if (whiteCapturedName) whiteCapturedName.textContent = wName;
